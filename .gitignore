@@ -1,0 +1,14 @@
+# Virtual environment
+venv/
+
+# Local data files
+data/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment secrets and GCP service account keys
+.env
+scripts/*.json
+*.json

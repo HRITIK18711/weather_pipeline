@@ -61,7 +61,7 @@ df_cleaned = df_merged.dropna(subset=["Temperature", "Latitude", "Longitude"]).c
 # Ensure population column exists and enforce int64
 if "Population" not in df_cleaned.columns:
     df_cleaned["Population"] = 15000000  # Fallback default if population.csv omitted it
-df_cleaned["Population"] = df_cleaned["Population"].fillna(0).astype("int64")
+df_cleaned["Population"] = df_cleaned["Population"].astype(str).str.replace(",", "").str.strip().fillna(0).astype("int64")
 
 # Enforce float64 types
 df_cleaned["Temperature"] = df_cleaned["Temperature"].astype("float64")
@@ -89,21 +89,26 @@ print(df_cleaned[["City", "Country", "Population", "Temperature", "Temp_Category
 # 5. BigQuery Upload
 # ==========================================
 KEY_PATH = os.path.join(os.path.dirname(__file__), "gcp-key.json")
-PROJECT_ID = "weather-demographics-bootcamp"
+PROJECT_ID = "modified-link-512401-l9"
 DATASET_ID = "global_weather_data"
 TABLE_ID = "current_weather_stats"
 
 if os.path.exists(KEY_PATH):
     print("\nAuthenticating with BigQuery...")
-    client = bigquery.Client.from_service_account_json(KEY_PATH, project=PROJECT_ID)
-    table_ref = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
+    # Specify the dataset location (match the region you chose when creating global_weather_data, e.g., "US")
+client = bigquery.Client(project=PROJECT_ID, location="US")
 
-    job_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
-    )
+# Increase the job timeout to prevent 503 drops
+job_config = bigquery.LoadJobConfig(
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
 
-    job = client.load_table_from_dataframe(df_cleaned, table_ref, job_config=job_config)
-    job.result()  # Wait for upload to complete
-    print(f"Successfully loaded {len(df_cleaned)} rows into {table_ref}.")
-else:
-    print(f"\n[Notice] {KEY_PATH} not found. Local data processing passed successfully.")
+print(f"Loading data to BigQuery: {table_ref}...")
+job = client.load_table_from_dataframe(
+    df_cleaned, 
+    table_ref, 
+    job_config=job_config,
+    timeout=60.0  # Gives the server ample time to acknowledge the upload
+)
+job.result()
+print("Data loaded to BigQuery successfully.")
